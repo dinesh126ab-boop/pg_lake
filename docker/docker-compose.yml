@@ -1,0 +1,90 @@
+services:
+  pg_lake-postgres:
+    build:
+      context: .
+      ssh:
+        - default
+      dockerfile: Dockerfile
+      target: pg_lake_postgres
+      args:
+        - BASE_IMAGE_OS=almalinux
+        - BASE_IMAGE_TAG=9
+    container_name: pg_lake
+    volumes:
+      - ${USERPROFILE}${HOME}/.ssh:/postgres/.ssh:ro
+      - ${USERPROFILE}${HOME}/.ssh/known_hosts:/postgres/.ssh/known_hosts:rw
+      - ${USERPROFILE}${HOME}/.gitconfig:/postgres/.gitconfig:ro
+      - ${USERPROFILE}${HOME}/.aws:/postgres/.aws:rw
+      - ./scripts/entrypoint-postgres.sh:/entrypoint-postgres.sh
+      - ./scripts/init-postgres.sql:/init-postgres.sql
+      - pgduck-unix-socket-volume:/home/postgres/pgduck_socket_dir
+      - pg-18-tmp-dir-volume:/home/postgres/pgsql-18/data/base/pgsql_tmp
+      - pg-17-tmp-dir-volume:/home/postgres/pgsql-17/data/base/pgsql_tmp
+      - pg-16-tmp-dir-volume:/home/postgres/pgsql-16/data/base/pgsql_tmp
+    entrypoint: ["/entrypoint-postgres.sh"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "psql", "-c", "create table test(a int) using iceberg; drop table test;"]
+      interval: 6s
+      timeout: 2s
+      start_period: 20s
+      retries: 3
+    env_file:
+      - .env
+    cap_add:
+      - SYS_PTRACE
+    depends_on:
+      - pgduck-server
+
+  pgduck-server:
+    build:
+      context: .
+      ssh:
+        - default
+      dockerfile: Dockerfile
+      target: pgduck_server
+      args:
+        - BASE_IMAGE_OS=almalinux
+        - BASE_IMAGE_TAG=9
+    container_name: pgduck-server
+    volumes:
+      - ./scripts/entrypoint-pgduck-server.sh:/entrypoint-pgduck-server.sh
+      - ./scripts/init-pgduck-server.sql:/init-pgduck-server.sql
+      - ${USERPROFILE}${HOME}/.aws:/root/.aws:ro
+      - pgduck-unix-socket-volume:/home/postgres/pgduck_socket_dir
+      - pg-18-tmp-dir-volume:/home/postgres/pgsql-18/data/base/pgsql_tmp
+      - pg-17-tmp-dir-volume:/home/postgres/pgsql-17/data/base/pgsql_tmp
+      - pg-16-tmp-dir-volume:/home/postgres/pgsql-16/data/base/pgsql_tmp
+    entrypoint: ["/entrypoint-pgduck-server.sh"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "psql", "-p", "5332", "-h", "/home/postgres/pgduck_socket_dir", "-c", "SELECT 1;"]
+      interval: 6s
+      timeout: 2s
+      start_period: 20s
+      retries: 3
+    env_file:
+      - .env
+    cap_add:
+      - SYS_PTRACE
+    depends_on:
+      - minio
+
+  minio:
+    image: minio/minio
+    container_name: minio
+    volumes:
+        - ./scripts/entrypoint-minio.sh:/entrypoint-minio.sh
+    entrypoint: ["/entrypoint-minio.sh"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "http://localhost:9000"]
+      interval: 6s
+      timeout: 2s
+      retries: 3
+
+volumes:
+  pgduck-unix-socket-volume:
+  pg-18-tmp-dir-volume:
+  pg-17-tmp-dir-volume:
+  pg-16-tmp-dir-volume:

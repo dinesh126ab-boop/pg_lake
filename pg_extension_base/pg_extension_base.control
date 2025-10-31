@@ -1,0 +1,5 @@
+comment = 'Extension development kit by Snowflake'
+default_version = '1.6'
+module_pathname = '$libdir/pg_extension_base'
+relocatable = false
+schema = pg_catalog

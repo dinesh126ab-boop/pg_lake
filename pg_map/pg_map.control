@@ -1,0 +1,5 @@
+default_version = '1.2'
+module_pathname = '$libdir/pg_map'
+relocatable = false
+schema = pg_catalog
+comment = 'Map type for Postgres'
