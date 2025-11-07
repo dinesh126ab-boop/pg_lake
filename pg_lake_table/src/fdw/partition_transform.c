@@ -716,6 +716,13 @@ ApplyBucketTransformToColumn(IcebergPartitionTransform * transform, Datum column
 	{
 		DateADT		value = DatumGetDateADT(columnValue);
 
+		/* Reject +-Infinity dates early to avoid overflows in partition transforms */
+		if (DATE_NOT_FINITE(value))
+			ereport(ERROR,
+					(errcode(ERRCODE_DATETIME_VALUE_OUT_OF_RANGE),
+					 errmsg("+-Infinity dates are not allowed in iceberg tables"),
+					 errhint("Delete or replace +-Infinity values.")));
+
 		int32_t		daysFromEpoch = AdjustDateFromPostgresToUnix(value);
 
 		/*
@@ -728,6 +735,13 @@ ApplyBucketTransformToColumn(IcebergPartitionTransform * transform, Datum column
 	{
 		Timestamp	value = DatumGetTimestamp(columnValue);
 
+		/* Reject +-Infinity timestamps early to avoid overflows in partition transforms */
+		if (TIMESTAMP_NOT_FINITE(value))
+			ereport(ERROR,
+					(errcode(ERRCODE_DATETIME_VALUE_OUT_OF_RANGE),
+					 errmsg("+-Infinity timestamps are not allowed in iceberg tables"),
+					 errhint("Delete or replace +-Infinity values.")));
+
 		int64_t		microsecsFromEpoch = AdjustTimestampFromPostgresToUnix(value);
 
 		*bucketValue = (MurmurHash3_32_Long(microsecsFromEpoch) & INT32_MAX) % transform->bucketCount;
@@ -735,6 +749,13 @@ ApplyBucketTransformToColumn(IcebergPartitionTransform * transform, Datum column
 	else if (transform->pgType.postgresTypeOid == TIMESTAMPTZOID)
 	{
 		TimestampTz value = DatumGetTimestampTz(columnValue);
+
+		/* Reject +-Infinity timestamptz early as well */
+		if (TIMESTAMP_NOT_FINITE(value))
+			ereport(ERROR,
+					(errcode(ERRCODE_DATETIME_VALUE_OUT_OF_RANGE),
+					 errmsg("+-Infinity timestamps are not allowed in iceberg tables"),
+					 errhint("Delete or replace +-Infinity values.")));
 
 		int64_t		microsecsFromEpoch = AdjustTimestampFromPostgresToUnix(value);
 

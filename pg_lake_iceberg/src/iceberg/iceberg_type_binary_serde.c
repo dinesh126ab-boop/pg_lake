@@ -221,6 +221,13 @@ PGIcebergBinarySerialize(Datum datum, Field * field, PGType pgType, bool addNull
 	{
 		DateADT		dateValue = DatumGetDateADT(datum);
 
+		/* Reject +-Infinity dates: these are not meaningful for Iceberg/other engines */
+		if (DATE_NOT_FINITE(dateValue))
+			ereport(ERROR,
+					(errcode(ERRCODE_DATETIME_VALUE_OUT_OF_RANGE),
+					 errmsg("+-Infinity dates are not allowed in iceberg tables"),
+					 errhint("Delete or replace +-Infinity values.")));
+
 		dateValue = AdjustDateFromPostgresToUnix(dateValue);
 
 		*binaryLen = sizeof(DateADT);
@@ -234,6 +241,13 @@ PGIcebergBinarySerialize(Datum datum, Field * field, PGType pgType, bool addNull
 	{
 		Timestamp	timestampValue = DatumGetTimestamp(datum);
 
+		/* Reject +-Infinity timestamps: these are not meaningful for Iceberg/other engines */
+		if (TIMESTAMP_NOT_FINITE(timestampValue))
+			ereport(ERROR,
+					(errcode(ERRCODE_DATETIME_VALUE_OUT_OF_RANGE),
+					 errmsg("+-Infinity timestamps are not allowed in iceberg tables"),
+					 errhint("Delete or replace +-Infinity values.")));
+
 		timestampValue = AdjustTimestampFromPostgresToUnix(timestampValue);
 
 		*binaryLen = sizeof(Timestamp);
@@ -246,6 +260,13 @@ PGIcebergBinarySerialize(Datum datum, Field * field, PGType pgType, bool addNull
 	else if (pgType.postgresTypeOid == TIMESTAMPTZOID)
 	{
 		TimestampTz timestampTzValue = DatumGetTimestampTz(datum);
+
+		/* Reject +-Infinity timestamptz values too */
+		if (TIMESTAMP_NOT_FINITE(timestampTzValue))
+			ereport(ERROR,
+					(errcode(ERRCODE_DATETIME_VALUE_OUT_OF_RANGE),
+					 errmsg("+-Infinity timestamps are not allowed in iceberg tables"),
+					 errhint("Delete or replace +-Infinity values.")));
 
 		timestampTzValue = AdjustTimestampFromPostgresToUnix(timestampTzValue);
 
